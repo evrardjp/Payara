@@ -126,7 +126,8 @@
             <admin-audit-configuration>
               <notifier>log-notifier</notifier>
             </admin-audit-configuration>
-            <diagnostic-service />
+	   <diagnostic-service />
+            <phone-home-runtime-configuration enabled="false"/>
             <security-service>
                 <auth-realm classname="com.sun.enterprise.security.auth.realm.file.FileRealm" name="admin-realm">
                     <property value="${com.sun.aas.instanceRoot}/config/admin-keyfile" name="file" />

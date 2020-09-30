@@ -36,6 +36,8 @@ RUN true \
         /tmp/password-change-file.txt \
         ${PAYARA_DIR}/glassfish/domains/${DOMAIN_NAME}/osgi-cache \
         ${PAYARA_DIR}/glassfish/domains/${DOMAIN_NAME}/logs \
+    && ${PAYARA_DIR}/bin/asadmin --user=${ADMIN_USER} --passwordfile=${PASSWORD_FILE} \
+      disable-phone-home \
     && true
 
 ENTRYPOINT ["/tini", "--"]

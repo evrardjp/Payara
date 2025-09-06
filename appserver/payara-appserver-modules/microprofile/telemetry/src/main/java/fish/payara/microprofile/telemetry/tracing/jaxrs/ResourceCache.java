@@ -2,14 +2,14 @@
  *
  *  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- *  Copyright (c) 2023 Payara Foundation and/or its affiliates. All rights reserved.
+ *  Copyright (c) 2023-2024 Payara Foundation and/or its affiliates. All rights reserved.
  *
  *  The contents of this file are subject to the terms of either the GNU
  *  General Public License Version 2 only ("GPL") or the Common Development
  *  and Distribution License("CDDL") (collectively, the "License").  You
  *  may not use this file except in compliance with the License.  You can
  *  obtain a copy of the License at
- *  https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *  https://github.com/payara/Payara/blob/main/LICENSE.txt
  *  See the License for the specific
  *  language governing permissions and limitations under the License.
  *
@@ -47,7 +47,6 @@ import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
-import org.eclipse.microprofile.opentracing.Traced;
 
 class ResourceCache<T> {
 
@@ -82,5 +81,13 @@ class ResourceCache<T> {
 
     T get(ResourceInfo info, Supplier<T> supplier) {
         return tracedCache.computeIfAbsent(new ResourceKey(info), k -> supplier.get());
+    }
+
+    /**
+     * clear all classes belonging to this class loader
+     * @param classLoader
+     */
+    void clear(ClassLoader classLoader) {
+        tracedCache.entrySet().removeIf(entry -> entry.getKey().resourceClass.getClassLoader() == classLoader);
     }
 }

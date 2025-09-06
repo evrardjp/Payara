@@ -1,14 +1,18 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) [2021] Payara Foundation and/or its affiliates. All rights reserved.
+<<<<<<< HEAD
+ * Copyright (c) [2021-2025] Payara Foundation and/or its affiliates. All rights reserved.
+=======
+ * Copyright (c) [2021-2024] Payara Foundation and/or its affiliates. All rights reserved.
+>>>>>>> upstream/FISH-10752-Reapply-EAR-Deployment-Changes-and-Shared-War-Libs
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -43,16 +47,16 @@ import com.sun.enterprise.deployment.Application;
 import com.sun.enterprise.deployment.BundleDescriptor;
 import com.sun.enterprise.deployment.EjbBundleDescriptor;
 import com.sun.enterprise.deployment.EjbDescriptor;
-import junit.framework.TestCase;
 import org.glassfish.deployment.common.ModuleDescriptor;
 import org.glassfish.weld.WeldDeployer;
 import org.jboss.weld.bootstrap.WeldBootstrap;
 import org.jboss.weld.bootstrap.spi.BeanDeploymentArchive;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -60,8 +64,7 @@ import java.util.Map;
 
 import static org.mockito.Mockito.*;
 
-@RunWith(MockitoJUnitRunner.class)
-public class JCDIServiceImplTest extends TestCase {
+public class JCDIServiceImplTest {
 
     @Mock
     private EjbDescriptor ejbDescriptor;
@@ -90,32 +93,35 @@ public class JCDIServiceImplTest extends TestCase {
     @InjectMocks
     private JCDIServiceImpl jcdiServiceImpl = new JCDIServiceImpl();
 
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
+
     @Test
     public void createJCDIInjectionContextWithoutNullPointerException() {
         Map<Class<?>, Object> ejbInfo = Collections.emptyMap();
         Collection<String> emptyListNames = Collections.emptyList();
         Collection<BeanDeploymentArchive> emptyListOfArchives = Collections.emptyList();
         when(ejbDescriptor.getEjbBundleDescriptor()).thenReturn(ejbBundleDescriptor);
-        when(ejbBundleDescriptor.getApplication()).thenReturn(application);
         when(ejbBundleDescriptor.getModuleDescriptor()).thenReturn(moduleDescriptor);
         when(moduleDescriptor.getDescriptor()).thenReturn(bundleDescriptor);
         when(ejbDescriptor.getEjbClassName()).thenReturn("EjbName");
         when(weldDeployer.getBeanDeploymentArchiveForBundle(bundleDescriptor)).thenReturn(beanDeploymentArchive);
-        when(weldDeployer.getBootstrapForApp(application)).thenReturn(bootstrap);
+        when(weldDeployer.getBootstrapForArchive(beanDeploymentArchive)).thenReturn(bootstrap);
         when(beanDeploymentArchive.getBeanClasses()).thenReturn(emptyListNames);
         when(beanDeploymentArchive.getBeanDeploymentArchives()).thenReturn(emptyListOfArchives);
 
         Object obj = jcdiServiceImpl.createJCDIInjectionContext(ejbDescriptor, ejbInfo);
 
-        assertNull(obj);
-        verify(ejbDescriptor, times(2)).getEjbBundleDescriptor();
+        Assert.assertNull(obj);
+        verify(ejbDescriptor, times(1)).getEjbBundleDescriptor();
         verify(ejbBundleDescriptor, times(1)).getModuleDescriptor();
         verify(moduleDescriptor, times(1)).getDescriptor();
         verify(weldDeployer, times(1)).getBeanDeploymentArchiveForBundle(bundleDescriptor);
         verify(beanDeploymentArchive, times(1)).getBeanClasses();
         verify(beanDeploymentArchive, times(1)).getBeanDeploymentArchives();
-        verify(ejbBundleDescriptor, times(1)).getApplication();
-        verify(weldDeployer, times(1)).getBootstrapForApp(application);
+        verify(weldDeployer, times(1)).getBootstrapForArchive(beanDeploymentArchive);
         verify(bootstrap, times(1)).getManager(beanDeploymentArchive);
     }
 }

@@ -55,7 +55,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Portions Copyright 2016-2023 Payara Foundation and/or its affiliates
+// Portions Copyright 2016-2025 Payara Foundation and/or its affiliates
 
 package org.glassfish.web.loader;
 
@@ -65,6 +65,7 @@ import com.sun.appserv.server.util.PreprocessorUtil;
 import com.sun.enterprise.deployment.Application;
 import com.sun.enterprise.deployment.util.DOLUtils;
 import com.sun.enterprise.glassfish.bootstrap.MainHelper.HotSwapHelper;
+import com.sun.enterprise.loader.CacheCleaner;
 import com.sun.enterprise.security.integration.DDPermissionsLoader;
 import com.sun.enterprise.security.integration.PermsHolder;
 import com.sun.enterprise.util.io.FileUtils;
@@ -80,6 +81,7 @@ import org.glassfish.api.deployment.InstrumentableClassLoader;
 import org.glassfish.api.deployment.ResourceClassLoader;
 import org.glassfish.api.deployment.ResourceEntry;
 import org.glassfish.common.util.InstanceCounter;
+import org.glassfish.exousia.AuthorizationService;
 import org.glassfish.hk2.api.PreDestroy;
 import org.glassfish.web.util.ExceptionUtils;
 import org.glassfish.web.util.IntrospectionUtils;
@@ -121,6 +123,7 @@ import java.security.ProtectionDomain;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -136,6 +139,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Predicate;
 import java.util.jar.Attributes;
 import java.util.jar.Attributes.Name;
 import java.util.jar.JarEntry;
@@ -1172,6 +1176,18 @@ public class WebappClassLoader
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+        Predicate<String> matchesInternal = str -> str.matches(".*generated/.*__.*");
+        boolean isInternal = false;
+        if (repositoryURLs != null) {
+            isInternal = Arrays.stream(repositoryURLs).map(URL::toString)
+                    .filter(matchesInternal).findAny().isPresent();
+        }
+        if (canonicalLoaderDir != null && matchesInternal.test(canonicalLoaderDir)) {
+            isInternal = true;
+        }
+        if (isInternal) {
+            sb.append("(internal) ");
+        }
         sb.append("WebappClassLoader (delegate=");
         sb.append(delegate);
         if (repositoryURLs != null) {
@@ -1829,6 +1845,11 @@ public class WebappClassLoader
             // Ignore
         }
 
+        // If we haven't found it locally, and we're using bundled JSF, DON'T delegate any lookup if it's a JSF class
+        if (useMyFaces && !delegateLoad && (name.startsWith("javax.faces") || name.startsWith("jakarta.faces") || name.startsWith("com.sun.faces"))) {
+            throw new ClassNotFoundException(String.format("Class [%s] could not be found in bundled JSF", name));
+        }
+
         // (3) Delegate if class was not found locally
         if ((application.isWhitelistEnabled()? isWhitelisted : true) && !delegateLoad) {
             if (logger.isLoggable(Level.FINER)) {
@@ -2031,6 +2052,7 @@ public class WebappClassLoader
         // START SJSAS 6258619
         ClassLoaderUtil.releaseLoader(this);
         // END SJSAS 6258619
+        CacheCleaner.clearCaches(this);
 
         synchronized(jarFilesLock) {
             started = false;
@@ -2637,7 +2659,6 @@ public class WebappClassLoader
         }
     }
 
-
     /**
      * Clear the {@link ResourceBundle} cache of any bundles loaded by this
      * class loader or any class loader where this loader is a parent class
@@ -3210,7 +3231,7 @@ public class WebappClassLoader
             // The policy file may have been modified to adjust
             // permissions, so we're reloading it when loading or
             // reloading a Context
-            Policy policy = Policy.getPolicy();
+            Policy policy = AuthorizationService.getPolicy();
             policy.refresh();
         } catch (AccessControlException e) {
             // Some policy files may restrict this, even for the core,

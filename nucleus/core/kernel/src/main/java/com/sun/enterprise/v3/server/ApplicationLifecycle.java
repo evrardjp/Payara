@@ -38,10 +38,11 @@
  * holder.
  */
 
-// Portions Copyright [2016-2022] [Payara Foundation and/or its affiliates.]
+// Portions Copyright 2016-2023 Payara Foundation and/or its affiliates.
 
 package com.sun.enterprise.v3.server;
 
+import fish.payara.deployment.transformer.api.JakartaNamespaceDeploymentTransformer;
 import fish.payara.nucleus.hotdeploy.HotDeployService;
 import fish.payara.nucleus.hotdeploy.ApplicationState;
 import com.sun.enterprise.config.serverbeans.*;
@@ -211,15 +212,6 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
     protected Logger logger = KernelLoggerInfo.getLogger();
     final private static LocalStringManagerImpl localStrings = new LocalStringManagerImpl(ApplicationLifecycle.class);
 
-    private final ThreadLocal<Deque<ExtendedDeploymentContext>> currentDeploymentContext //
-        = new ThreadLocal<Deque<ExtendedDeploymentContext>>() {
-
-            @Override
-            protected Deque<ExtendedDeploymentContext> initialValue() {
-            return new ArrayDeque<>(5);
-        }
-    };
-
     protected DeploymentLifecycleProbeProvider
         deploymentLifecycleProbeProvider = null;
 
@@ -290,7 +282,6 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
         events.send(new Event<>(Deployment.DEPLOYMENT_START, context), false);
         eventSpan.close();
 
-        currentDeploymentContext.get().push(context);
         final ActionReport report = context.getActionReport();
         final DeployCommandParameters commandParams = context.getCommandParameters(DeployCommandParameters.class);
         final String appName = commandParams.name();
@@ -357,6 +348,7 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
             }
         };
 
+        DeploymentUtils.setCurrentDeploymentContext(context);
         try (DeploymentSpan topSpan = tracing.startSpan(DeploymentTracing.AppStage.PREPARE);
              SpanSequence span = tracing.startSequence(DeploymentTracing.AppStage.PREPARE, "ArchiveMetadata")) {
             if (commandParams.origin == OpsParams.Origin.deploy
@@ -405,12 +397,14 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
 
             span.start(DeploymentTracing.AppStage.CLASS_SCANNING);
 
-
+            Types types = null;
             if (handler.requiresAnnotationScanning(context.getSource())) {
-                getDeployableTypes(context);
+                types = getDeployableTypes(context);
             }
 
             span.finish();
+
+            transformApplication(context, types, tracing, span);
 
             // containers that are started are not stopped even if
             // the deployment fail, the main reason
@@ -601,6 +595,7 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
             if (report.getActionExitCode() != ActionReport.ExitCode.SUCCESS) {
                 context.postDeployClean(false /* not final clean-up yet */);
                 events.send(new Event<>(Deployment.DEPLOYMENT_FAILURE, context));
+                DeploymentUtils.clearCurrentDeploymentContext();
             }
         }
         ApplicationDeployment depl = new ApplicationDeployment(appInfo, context);
@@ -621,6 +616,7 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
         // time the containers are set up, all the modules have been prepared in their
         // associated engines and the application info is created and registered
         if (loadOnCurrentInstance(context)) {
+            DeploymentUtils.setCurrentDeploymentContext(context);
             try (SpanSequence span = tracing.startSequence(DeploymentTracing.AppStage.INITIALIZE)){
                 notifyLifecycleInterceptorsBefore(ExtendedDeploymentContext.Phase.START, context);
                 appInfo.initialize();
@@ -642,11 +638,11 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
                 } else {
                     events.send(new Event<>(Deployment.DEPLOYMENT_SUCCESS, appInfo));
                 }
+                DeploymentUtils.clearCurrentDeploymentContext();
             }
-            currentDeploymentContext.get().pop();
         }
     }
-
+    
     @Override
     public ApplicationInfo deploy(final ExtendedDeploymentContext context) {
         return deploy(null, context);
@@ -790,6 +786,61 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
             return null;
         }
         return new ClassloaderResourceLocatorAdapter(commonClassLoaderService.getCommonClassLoader());
+    }
+
+    private void transformApplication(ExtendedDeploymentContext context, Types types,
+            StructuredDeploymentTracing tracing, SpanSequence span) throws IOException {
+        String transformNS = System.getProperty("fish.payara.deployment.transform.namespace");
+
+        if (Boolean.parseBoolean(transformNS) || transformNS == null) {
+            span.start(DeploymentTracing.AppStage.TRANSFORM_ARCHIVE);
+
+            Optional<JakartaNamespaceDeploymentTransformer> jakartaNamespaceDeploymentTransformerOptional;
+            try {
+                jakartaNamespaceDeploymentTransformerOptional = ServiceLoader.load(
+                        JakartaNamespaceDeploymentTransformer.class).findFirst();
+            } catch (NoClassDefFoundError exception) {
+                // ClassNotFoundException gets thrown if we've found a service but couldn't instantiate it
+                logger.log(Level.WARNING,
+                        "Caught exception trying to instantiate a deployment transformer, skipping...",
+                        exception);
+                span.finish();
+                return;
+            }
+
+            if (!jakartaNamespaceDeploymentTransformerOptional.isPresent()) {
+                logger.log(Level.INFO, "No deployment transformer implementation found.");
+                span.finish();
+                return;
+            }
+
+            JakartaNamespaceDeploymentTransformer jakartaNamespaceDeploymentTransformerService =
+                    jakartaNamespaceDeploymentTransformerOptional.get();
+
+            if (types == null) {
+                types = getDeployableTypes(context);
+            }
+
+            if (!jakartaNamespaceDeploymentTransformerService.isJakartaEEApplication(types)) {
+                context.getSource().close();
+
+                // DeploymentException will be thrown here if this fails
+                File output = jakartaNamespaceDeploymentTransformerService.transformApplication(context);
+
+                context.getAppProps().setProperty(ServerTags.EMPTY_BEANS_XML_MODE_ALL_PROP, Boolean.TRUE.toString());
+                context.setSource((FileArchive) archiveFactory.createArchive(output));
+
+                // reset transient and module data of original deployed archive
+                context.removeTransientAppMetaData(Types.class.getName());
+                context.removeTransientAppMetaData(Parser.class.getName());
+                context.resetModuleMetaData();
+                tracing.register(context);
+
+                // Rescan for the data we just removed
+                getDeployableTypes(context);
+            }
+            span.finish();
+        }
     }
 
     private void notifyLifecycleInterceptorsBefore(final ExtendedDeploymentContext.Phase phase,
@@ -1193,6 +1244,7 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
             // get the deployer
             Deployer deployer = engineInfo.getDeployer();
 
+            ExtendedDeploymentContext savedDeploymentContext = DeploymentUtils.getCurrentDeploymentContext();
             try (DeploymentSpan span = tracing.startSpan(TraceContext.Level.CONTAINER, engineInfo.getSniffer().getModuleType(), DeploymentTracing.AppStage.PREPARE)){
                 deployer.prepare(context);
 
@@ -1207,6 +1259,10 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
                 final ActionReport report = context.getActionReport();
                 report.failure(logger, "Exception while invoking " + deployer.getClass() + " prepare method", e);
                 throw e;
+            } finally {
+                if (getCurrentDeploymentContext() == null) {
+                    DeploymentUtils.setCurrentDeploymentContext(savedDeploymentContext);
+                }
             }
         }
 
@@ -2654,6 +2710,6 @@ public class ApplicationLifecycle implements Deployment, PostConstruct {
 
     @Override
     public ExtendedDeploymentContext getCurrentDeploymentContext() {
-        return currentDeploymentContext.get().peek();
+        return DeploymentUtils.getCurrentDeploymentContext();
     }
 }

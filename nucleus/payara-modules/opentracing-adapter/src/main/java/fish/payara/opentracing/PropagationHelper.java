@@ -9,7 +9,7 @@
  *  and Distribution License("CDDL") (collectively, the "License").  You
  *  may not use this file except in compliance with the License.  You can
  *  obtain a copy of the License at
- *  https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *  https://github.com/payara/Payara/blob/main/LICENSE.txt
  *  See the License for the specific
  *  language governing permissions and limitations under the License.
  *
@@ -138,6 +138,13 @@ public class PropagationHelper implements Scope {
 
     @Override
     public void close() {
+        closeContext();
+        if (singleThreaded && !errorReported) {
+            end();
+        }
+    }
+
+    public void closeContext() {
         if (spanScope != null) {
             spanScope.close();
             spanScope = null;
@@ -145,9 +152,6 @@ public class PropagationHelper implements Scope {
         if (contextScope != null) {
             contextScope.close();
             contextScope = null;
-        }
-        if (singleThreaded && !errorReported) {
-            end();
         }
     }
 

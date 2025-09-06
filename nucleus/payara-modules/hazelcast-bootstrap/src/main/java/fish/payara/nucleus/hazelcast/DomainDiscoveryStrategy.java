@@ -8,7 +8,7 @@
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -81,6 +81,7 @@ import java.util.logging.Logger;
  * of host-aware partitioning and custom API-based discovery strategy
  *
  * @author lprimak
+ * @author steve
  */
 public final class DomainDiscoveryStrategy extends AbstractDiscoveryStrategy {
     private final boolean hostAwarePartitioning;
@@ -97,7 +98,6 @@ public final class DomainDiscoveryStrategy extends AbstractDiscoveryStrategy {
      * Provides a Discovery SPI implementation for Hazelcast that uses knowledge
      * of the domain topology to build out the cluster and discover members
      * @since 5.0
-     * @author steve
      */
     @Override
     public Iterable<DiscoveryNode> discoverNodes() {

@@ -2,14 +2,14 @@
  *
  *  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- *  Copyright (c) 2023 Payara Foundation and/or its affiliates. All rights reserved.
+ *  Copyright (c) 2023-2024 Payara Foundation and/or its affiliates. All rights reserved.
  *
  *  The contents of this file are subject to the terms of either the GNU
  *  General Public License Version 2 only ("GPL") or the Common Development
  *  and Distribution License("CDDL") (collectively, the "License").  You
  *  may not use this file except in compliance with the License.  You can
  *  obtain a copy of the License at
- *  https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *  https://github.com/payara/Payara/blob/main/LICENSE.txt
  *  See the License for the specific
  *  language governing permissions and limitations under the License.
  *
@@ -43,6 +43,8 @@ package fish.payara.microprofile.telemetry.tracing.jaxrs;
 
 import fish.payara.microprofile.telemetry.tracing.PayaraTracingServices;
 import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.enterprise.inject.spi.BeanManager;
 import jakarta.enterprise.inject.spi.CDI;
 import jakarta.ws.rs.Path;
@@ -84,6 +86,22 @@ final class OpenTracingHelper {
             return Traced.class;
         }
     };
+    private static final WithSpan NULL_WITHSPAN = new WithSpan() {
+        @Override
+        public SpanKind kind() {
+            return null; // something to trigger sync
+        }
+
+        @Override
+        public String value() {
+            return null;
+        }
+
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return WithSpan.class;
+        }
+    };
 
 
     private final Config mpConfig;
@@ -93,6 +111,8 @@ final class OpenTracingHelper {
     private ResourceCache<String> operationNameCache = new ResourceCache<>();
 
     private ResourceCache<Traced> tracedCache = new ResourceCache<>();
+
+    private ResourceCache<WithSpan> withSpanCache = new ResourceCache<>();
 
     public OpenTracingHelper() {
         this.mpConfig = PayaraTracingServices.getConfig();
@@ -122,6 +142,13 @@ final class OpenTracingHelper {
                         + resourceInfo.getResourceMethod().getName();
             }
             return operationName;
+        }
+        var withSpanAnnotation = getWithSpanAnnotation(resourceInfo);
+        if (withSpanAnnotation != null) {
+            if (!"".equals(withSpanAnnotation.value())) {
+                // if non-default value is provided, then use it, otherwise just use the default
+                return withSpanAnnotation.value();
+            }
         }
 
         SpanStrategy naming = determineSpanStrategy();
@@ -323,12 +350,25 @@ final class OpenTracingHelper {
         return cached == NULL_TRACED ? null : cached;
     }
 
+    public WithSpan getWithSpanAnnotation(ResourceInfo resourceInfo) {
+        final BeanManager bm = getBeanManager();
+        if (bm == null) {
+            return null;
+        }
+        WithSpan cached = withSpanCache.get(resourceInfo, () -> computeWithSpanAnnotation(resourceInfo, bm));
+        return cached == NULL_WITHSPAN ? null : cached;
+    }
+    private WithSpan computeWithSpanAnnotation(ResourceInfo resourceInfo, BeanManager bm) {
+        var result = OpenTracingCdiUtils.getAnnotation(bm, WithSpan.class, resourceInfo);
+        return result == null ? NULL_WITHSPAN : result;
+    }
+
     private Traced computeTracedAnnotation(ResourceInfo resourceInfo, BeanManager beanManager) {
         Traced result = OpenTracingCdiUtils.getAnnotation(beanManager, Traced.class, resourceInfo);
         return result == null ? NULL_TRACED : result;
     }
 
-    private static ResourceCache<Boolean> canTraceCache = new ResourceCache<>();
+    static ResourceCache<Boolean> canTraceCache = new ResourceCache<>();
     /**
      * Helper method that checks if any specified skip patterns match this method name
      *

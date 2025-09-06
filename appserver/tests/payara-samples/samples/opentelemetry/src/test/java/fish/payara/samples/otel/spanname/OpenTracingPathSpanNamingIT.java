@@ -9,7 +9,7 @@
  *  and Distribution License("CDDL") (collectively, the "License").  You
  *  may not use this file except in compliance with the License.  You can
  *  obtain a copy of the License at
- *  https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *  https://github.com/payara/Payara/blob/main/LICENSE.txt
  *  See the License for the specific
  *  language governing permissions and limitations under the License.
  *
@@ -67,7 +67,7 @@ public class OpenTracingPathSpanNamingIT extends AbstractSpanNameTest {
 
     @Test
     public void testSpanName() {
-        var response = target(null).request().get();
+        var response = target(null, "async", "compute").request().get();
         assertEquals(200, response.getStatus());
         var spans = exporter.getSpans();
 

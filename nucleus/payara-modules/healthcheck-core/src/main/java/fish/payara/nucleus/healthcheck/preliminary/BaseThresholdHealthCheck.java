@@ -1,14 +1,14 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) 2016-2020 Payara Foundation and/or its affiliates. All rights reserved.
+ * Copyright (c) [2016-2025] Payara Foundation and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -39,6 +39,7 @@
  */
 package fish.payara.nucleus.healthcheck.preliminary;
 
+import fish.payara.internal.notification.EventLevel;
 import fish.payara.monitoring.collect.MonitoringWatchCollector;
 import fish.payara.notification.healthcheck.HealthCheckResultStatus;
 import fish.payara.nucleus.healthcheck.HealthCheckWithThresholdExecutionOptions;
@@ -58,14 +59,14 @@ public abstract class BaseThresholdHealthCheck<O extends HealthCheckWithThreshol
     /**
      * Creates an options instance from the properties
      * @param checker
-     * @return 
+     * @return A new options instance.
      */
     public HealthCheckWithThresholdExecutionOptions constructThresholdOptions(ThresholdDiagnosticsChecker checker) {
         return new HealthCheckWithThresholdExecutionOptions(
-                Boolean.valueOf(checker.getEnabled()),
+                Boolean.parseBoolean(checker.getEnabled()),
                 Long.parseLong(checker.getTime()),
                 asTimeUnit(checker.getUnit()),
-                Boolean.valueOf(checker.getAddToMicroProfileHealth()),
+                Boolean.parseBoolean(checker.getAddToMicroProfileHealth()),
                 checker.getPropertyValue(THRESHOLD_CRITICAL, THRESHOLD_DEFAULTVAL_CRITICAL),
                 checker.getPropertyValue(THRESHOLD_WARNING, THRESHOLD_DEFAULTVAL_WARNING),
                 checker.getPropertyValue(THRESHOLD_GOOD, THRESHOLD_DEFAULTVAL_GOOD));
@@ -87,6 +88,16 @@ public abstract class BaseThresholdHealthCheck<O extends HealthCheckWithThreshol
             return HealthCheckResultStatus.GOOD;
         }
         return HealthCheckResultStatus.FINE;
+    }
+
+    @Override
+    protected EventLevel createNotificationEventLevel (HealthCheckResultStatus checkResult) {
+        if (checkResult == HealthCheckResultStatus.GOOD || checkResult == HealthCheckResultStatus.FINE) {
+            return EventLevel.INFO;
+        } else if (checkResult == HealthCheckResultStatus.WARNING) {
+            return EventLevel.WARNING;
+        }
+        return EventLevel.SEVERE;
     }
 
     @Override

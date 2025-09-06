@@ -1,14 +1,14 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) [2016-2021] Payara Foundation and/or its affiliates. All rights reserved.
+ * Copyright (c) [2016-2025] Payara Foundation and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
+import fish.payara.internal.notification.EventLevel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
@@ -125,6 +126,8 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
     }
 
     protected abstract HealthCheckResult doCheckInternal();
+
+    protected abstract EventLevel createNotificationEventLevel (HealthCheckResultStatus checkResult);
     public abstract O constructOptions(C c);
 
     public HealthCheckResultStatus getMostRecentCumulativeStatus() {
@@ -173,24 +176,24 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
 
     protected HealthCheckExecutionOptions constructBaseOptions(Checker checker) {
         return new HealthCheckExecutionOptions(
-                Boolean.valueOf(checker.getEnabled()),
+                Boolean.parseBoolean(checker.getEnabled()),
                 Long.parseLong(checker.getTime()),
                 asTimeUnit(checker.getUnit()),
-                Boolean.valueOf(checker.getAddToMicroProfileHealth()));
+                Boolean.parseBoolean(checker.getAddToMicroProfileHealth()));
     }
 
     /**
      * Converts a string representing a timeunit to the value
      * i.e. {@code "MILLISECONDS"} to {@link TimeUnit#MILLISECONDS}
-     * @param unit
-     * @return 
+     * @param unit A string representing a TimeUnit.
+     * @return The TimeUnit.
      */
     protected TimeUnit asTimeUnit(String unit) {
         return TimeUnit.valueOf(unit);
     }
 
     /**
-     * Determines the level of of the healthcheck based on a time
+     * Determines the level of the healthcheck based on a time
      * @param duration length of time taken in milliseconds
      * @return {@link HealthCheckResultStatus.CRITICAL} if duration > 5 minutes;
      * {@link HealthCheckResultStatus.WARNING} if duration > 1 minute;
@@ -221,8 +224,8 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
      * of that unit.
      * <p>
      * Unit can be Gb, Mb, Kb or bytes.
-     * @param value
-     * @return 
+     * @param value The amount of bytes.
+     * @return Value as a human-friendly string.
      */
     protected String prettyPrintBytes(long value) {
         String result;
@@ -244,9 +247,8 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
     }
 
     /**
-     * Returns a string of tab-separated stack trace elements
-     * @param elements
-     * @return 
+     * @param elements Array of stack trace elements.
+     * @return A string of tab-separated stack trace elements.
      */
     protected String prettyPrintStackTrace(StackTraceElement[] elements) {
         StringBuilder sb = new StringBuilder();
@@ -257,8 +259,7 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
     }
 
     /**
-     * Returns a human-friendly description of the healthcheck
-     * @return 
+     * @return A human-friendly description of the healthcheck
      * @since 4.1.2.173
      */
     public String resolveDescription() {
@@ -266,8 +267,7 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
     }
 
     /**
-     * The key for a human-friendly description of the healthcheck
-     * @return 
+     * @return The key for a human-friendly description of the healthcheck
      */
     protected abstract String getDescription();
 
@@ -302,6 +302,7 @@ public abstract class BaseHealthCheck<O extends HealthCheckExecutionOptions, C e
             .message(messageFormatted)
             .data(new HealthCheckNotificationData(checkResult.getEntries()))
             .eventType(level.getName())
+            .level(this.createNotificationEventLevel(checkResult.getCumulativeStatus()))
             .build();
         notificationEventBus.publish(notification);
 

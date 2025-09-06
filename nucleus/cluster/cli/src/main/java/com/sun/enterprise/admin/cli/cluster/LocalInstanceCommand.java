@@ -37,11 +37,12 @@
  * only if the new code is made subject to such option by the copyright
  * holder.
  */
-// Portios Copyright [2019] [Payara Foundation and/or its affiliates]
+// Portios Copyright [2019-2025] [Payara Foundation and/or its affiliates]
 
 package com.sun.enterprise.admin.cli.cluster;
 
 import static com.sun.enterprise.admin.servermgmt.domain.DomainConstants.MASTERPASSWORD_FILE;
+import static com.sun.enterprise.admin.servermgmt.domain.DomainConstants.MASTERPASSWORD_LOCATION_FILE;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -51,8 +52,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Properties;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.enterprise.admin.cli.remote.RemoteCLICommand;
 import com.sun.enterprise.admin.servermgmt.cli.LocalServerCommand;
@@ -407,9 +411,13 @@ public abstract class LocalInstanceCommand extends LocalServerCommand {
             StringBuilder sb = new StringBuilder();
             sb.append("whackee=").append(whackee.toString());
             sb.append(", files in parent:");
-            files = parent.listFiles();
-            for (File f : files) {
-                sb.append(f.toString()).append(", ");
+            if (parent != null) {
+                files = parent.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        sb.append(f.toString()).append(", ");
+                    }
+                }
             }
             File f1 = new File(whackee.toString());
             sb.append(", new wackee.exists=").append(f1.exists());
@@ -419,15 +427,17 @@ public abstract class LocalInstanceCommand extends LocalServerCommand {
         // now see if the parent dir is empty.  If so wipe it out.
         // Don't be too picky with throwin errors here...
         try {
-            files = parent.listFiles();
+            if (parent != null) {
+                files = parent.listFiles();
 
-            if (noInstancesRemain(files)) {
-                File tmpwhackee = File.createTempFile("oldnode", null, grandParent);
-                if (!tmpwhackee.delete()) {
-                    throw new IOException(Strings.get("cantdelete", tmpwhackee));
+                if (noInstancesRemain(files)) {
+                    File tmpwhackee = File.createTempFile("oldnode", null, grandParent);
+                    if (!tmpwhackee.delete()) {
+                        throw new IOException(Strings.get("cantdelete", tmpwhackee));
+                    }
+                    FileUtils.renameFile(parent, tmpwhackee);
+                    FileUtils.whack(tmpwhackee);
                 }
-                FileUtils.renameFile(parent, tmpwhackee);
-                FileUtils.whack(tmpwhackee);
             }
         } catch (IOException ioe) {
             // we tried!!!
@@ -655,11 +665,27 @@ public abstract class LocalInstanceCommand extends LocalServerCommand {
 
     @Override
     protected File getMasterPasswordFile() {
-
-        if (nodeDirChild == null)
+        if (nodeDirChild == null) {
             return null;
+        }
 
-        File mp = new File(new File(nodeDirChild,"agent"), MASTERPASSWORD_FILE);
+        File mpLocation = new File(new File(nodeDirChild, "agent"), MASTERPASSWORD_LOCATION_FILE);
+        File mp;
+
+        if (mpLocation.canRead()) {
+            try {
+                String path = Files.readString(mpLocation.toPath(), StandardCharsets.UTF_8);
+                mp = new File(path);
+            }
+            catch (IOException e) {
+                Logger.getAnonymousLogger().log(Level.WARNING,
+                    "Failed to read master-password-location file due error: ", e);
+                mp = new File(new File(nodeDirChild, "agent"), MASTERPASSWORD_FILE);
+            }
+        } else {
+            mp = new File(new File(nodeDirChild, "agent"), MASTERPASSWORD_FILE);
+        }
+
         if (!mp.canRead()) {
             return null;
         }

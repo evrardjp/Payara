@@ -8,7 +8,7 @@
  *     and Distribution License("CDDL") (collectively, the "License").  You
  *     may not use this file except in compliance with the License.  You can
  *     obtain a copy of the License at
- *     https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *     https://github.com/payara/Payara/blob/main/LICENSE.txt
  *     See the License for the specific
  *     language governing permissions and limitations under the License.
  *
@@ -118,8 +118,7 @@ public class MetricsInterceptor {
             Class<?> type = beanClass;
             do {
                 for (Method method : type.getDeclaredMethods()) {
-                    //for gouge should we need to consider private methods, wait for answer
-                    if (!method.isSynthetic()) { //&& !Modifier.isPrivate(method.getModifiers())) {
+                    if (!method.isSynthetic() && !Modifier.isPrivate(method.getModifiers())) {
                         registerMetrics(beanClass, method, context.getTarget(), metricsService);
                         //review metrics from stereotypes applied to methods
                         registerFromStereotypes(bean.getStereotypes(), beanClass, method,
@@ -212,7 +211,7 @@ public class MetricsInterceptor {
      * @param element method to evaluate
      * @return boolean indicating if this is a private method
      */
-    private <E extends Member & AnnotatedElement> boolean isMethodPrivate(E element) {
+    public static <E extends Member & AnnotatedElement> boolean isMethodPrivate(E element) {
         if(element instanceof Method && Modifier.isPrivate(((Method)element).getModifiers())){
             return true;
         }

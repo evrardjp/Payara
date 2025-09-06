@@ -1,14 +1,14 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) [2016-2021] Payara Foundation and/or its affiliates. All rights reserved.
+ * Copyright (c) [2016-2025] Payara Foundation and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -258,14 +258,14 @@ public class HealthCheckConfigurer implements AdminCommand {
 
         Set<String> notifiers = service.getEnabledNotifiers();
         if (enableNotifiers != null) {
-            enableNotifiers.forEach(notifiers::add);
+            notifiers.addAll(enableNotifiers);
         }
         if (disableNotifiers != null) {
             disableNotifiers.forEach(notifiers::remove);
         }
         if (setNotifiers != null) {
             notifiers.clear();
-            setNotifiers.forEach(notifiers::add);
+            notifiers.addAll(setNotifiers);
         }
     }
 }

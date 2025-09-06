@@ -1,13 +1,13 @@
 /*
  *
- * Copyright (c) 2016-2021 Payara Foundation and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2025 Payara Foundation and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -75,7 +75,7 @@ import java.util.*;
 public class ListHistoricHealthChecks implements AdminCommand {
 
     private static final String SEPARATOR = " - ";
-    private static final String headers[] = {"Occurring Date", "Health Check Message"};
+    private static final String[] headers = {"Occurring Date", "Health Check Message"};
 
     @Inject
     protected Target targetUtil;
@@ -123,12 +123,12 @@ public class ListHistoricHealthChecks implements AdminCommand {
 
         ColumnFormatter columnFormatter = new ColumnFormatter(headers);
         Properties extrasProps = new Properties();
-        List historic = new ArrayList<>();
+        List<LinkedHashMap<String, String>> historic = new ArrayList<>();
 
         if (traces != null) {
             for (HistoricHealthCheckEvent historicHealthCheckEvent : traces) {
-                LinkedHashMap<String, String> messages = new LinkedHashMap<String, String>();
-                Object values[] = new Object[2];
+                LinkedHashMap<String, String> messages = new LinkedHashMap<>();
+                Object[] values = new Object[2];
                 values[0] = new Date(historicHealthCheckEvent.getOccurringTime());
                 values[1] = constructMessage(historicHealthCheckEvent);
                 messages.put("dateTime",values[0].toString());

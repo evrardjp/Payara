@@ -1,14 +1,14 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) 2019 Payara Foundation and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019-2025 Payara Foundation and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -88,7 +88,7 @@ public final class FileDeletionThread extends Thread {
                 if (deletionSuccessful ||
                         deletionAttempts.compute(
                             fileToDelete,
-                            (file, attempts) -> attempts == null ? 1 : ++attempts
+                            (file, attempts) -> attempts == null ? 1 : attempts + 1
                         ) > MAX_DELETION_ATTEMPTS) {
                     // file deleted or attempted deletion exceeded max attempts
                     fileIterator.remove();

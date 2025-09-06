@@ -1,12 +1,12 @@
-/* 
- *     Copyright (c) [2016-2020] Payara Foundation and/or its affiliates. All rights reserved.
+/*
+ *     Copyright (c) [2016-2024] Payara Foundation and/or its affiliates. All rights reserved.
  * 
  *     The contents of this file are subject to the terms of either the GNU
  *     General Public License Version 2 only ("GPL") or the Common Development
  *     and Distribution License("CDDL") (collectively, the "License").  You
  *     may not use this file except in compliance with the License.  You can
  *     obtain a copy of the License at
- *     https://github.com/payara/Payara/blob/master/LICENSE.txt
+ *     https://github.com/payara/Payara/blob/main/LICENSE.txt
  *     See the License for the specific
  *     language governing permissions and limitations under the License.
  * 
@@ -164,13 +164,14 @@ public class PayaraRestApiHandlers {
             command = splitCommand[0];
 
             // Convert the parameters into a space-separated string
-            String parameters = "";
+            String parameters;
+            StringBuilder paramBuilder = new StringBuilder();
             for (int i = 1; i < splitCommand.length; i++) {
-                parameters += splitCommand[i] + " ";
+                paramBuilder.append(splitCommand[i]).append(" ");
             }
 
             // Remove any trailing spaces
-            parameters = parameters.trim();
+            parameters = paramBuilder.toString().trim();
 
             // Get the parameters from each row, and send the asadmin command
             for (Map row : selectedRows) {
@@ -280,60 +281,6 @@ public class PayaraRestApiHandlers {
             }
           }catch(Exception ex){
             GuiUtil.getLogger().info(GuiUtil.getCommonMessage("log.error.hasRestEndpoints") + ex.getLocalizedMessage());
-            if (GuiUtil.getLogger().isLoggable(Level.FINE)){
-                ex.printStackTrace();
-            }
-          }
-          handlerCtx.setOutputValue("result", result);
-    }
-    
-    /**
-     * Gets a map of components with CDI dev mode status
-     * @param handlerCtx 
-     */
-    @Handler(id = "py.isCDIDevMode",
-        input = {
-            @HandlerInput(name = "appName", type = String.class, required = true),
-            @HandlerInput(name = "rowList", type = java.util.List.class, required = true)},
-        output = {
-            @HandlerOutput(name = "result", type = java.util.Map.class)})
-    public static void isCDIDevMode(HandlerContext handlerCtx) {
-        Map result = new HashMap();
-        try{
-            String appName = (String) handlerCtx.getInputValue("appName");
-            String encodedAppName = URLEncoder.encode(appName, "UTF-8");
-            List rowList = (List) handlerCtx.getInputValue("rowList");
-            for(Object row : rowList) {
-                Map rowMap = (Map) row;
-                boolean enabled = false;
-                String componentName = (String) rowMap.get("name");
-                String encodedComponentName = URLEncoder.encode(componentName, "UTF-8");
-                result.put(componentName, false);
-                if(!((String)rowMap.get("sniffers")).contains("cdi")){
-                    continue;
-                }
-                
-                String endpoint = GuiUtil.getSessionValue("REST_URL") + "/applications/application/" + encodedAppName + "/property";
-                Map attrMap = Collections.singletonMap("componentname", encodedComponentName);
-                Map payaraEndpointDataMap = RestUtil.restRequest(endpoint, attrMap, "GET", null, true, false);
-                Map payaraEndpointsExtraProps = ((Map) ((Map) payaraEndpointDataMap.get("data")).get("extraProperties"));
-                List<Map> properties = (List<Map>)payaraEndpointsExtraProps.get("properties");
-                for (Map property : properties) {
-                    if (ServerTags.CDI_DEV_MODE_ENABLED_PROP.equals(property.get("name"))
-                            && Boolean.parseBoolean((String) property.get("value"))) {
-                        result.put(componentName, true);
-                        enabled = true;
-                        break;
-                    }
-                }
-                if (!enabled) {
-                    // constant inlined because we cannot transitively depend on Faces 4, which weld-integration would bring
-                    result.put(componentName, Boolean.getBoolean("org.jboss.weld.development"));
-                }
-            }
-
-          }catch(Exception ex){
-            GuiUtil.getLogger().log(Level.INFO, "{0}{1}", new Object[]{GuiUtil.getCommonMessage("log.error.isCDIDevMode"), ex.getLocalizedMessage()});
             if (GuiUtil.getLogger().isLoggable(Level.FINE)){
                 ex.printStackTrace();
             }

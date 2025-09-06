@@ -37,13 +37,14 @@
  * only if the new code is made subject to such option by the copyright
  * holder.
  */
-// Portions Copyright [2016-2019] [Payara Foundation and/or affiliates]
+// Portions Copyright [2016-2025] [Payara Foundation and/or affiliates]
 package com.sun.common.util.logging;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -101,7 +102,7 @@ public class LoggingOutputStream extends ByteArrayOutputStream {
         String logMessage = null;
         synchronized (this) {
             super.flush();
-            logMessage = this.toString();
+            logMessage = this.toString(StandardCharsets.UTF_8);
             super.reset();
         }
         if (logMessage.trim().length() == 0 || logMessage.trim().equals(lineSeparator)) {
@@ -117,7 +118,9 @@ public class LoggingOutputStream extends ByteArrayOutputStream {
         GFLogRecord logRecordWrapper = new GFLogRecord(logRecord);
         logRecordWrapper.setThreadName(Thread.currentThread().getName());
 
-        pendingRecords.offer(logRecordWrapper);
+        if (!pendingRecords.offer(logRecordWrapper)) {
+            logger.fine("LoggingOutputStream.flush(): pending records queue is full");
+        }
     }
 
     private void initializePump() {
@@ -220,7 +223,7 @@ public class LoggingOutputStream extends ByteArrayOutputStream {
         private ThreadLocal<StackTraceObjects> perThreadStObjects = new ThreadLocal<>();
 
         public LoggingPrintStream(ByteArrayOutputStream os) {
-            super(os, true);
+            super(os, true, StandardCharsets.UTF_8);
         }
 
         public void setLogger(Logger l) {
@@ -490,11 +493,11 @@ public class LoggingOutputStream extends ByteArrayOutputStream {
         private StackTraceObjects(Throwable x) {
             // alloc buffer for getting stack trace.
             stackTraceBuf = new ByteArrayOutputStream();
-            stStream = new PrintStream(stackTraceBuf, true);
+            stStream = new PrintStream(stackTraceBuf, true, StandardCharsets.UTF_8);
             comparisonBuf = new ByteArrayOutputStream();
-            cbStream = new PrintStream(comparisonBuf, true);
+            cbStream = new PrintStream(comparisonBuf, true, StandardCharsets.UTF_8);
             ((Throwable) x).printStackTrace(stStream);
-            stString = stackTraceBuf.toString();
+            stString = stackTraceBuf.toString(StandardCharsets.UTF_8);
             stackTraceBufBytes = stackTraceBuf.size();
             // helps keep our stack trace skipping logic simpler.
             cbStream.println(x);
@@ -509,7 +512,7 @@ public class LoggingOutputStream extends ByteArrayOutputStream {
             String cbString;
             int cbLen;
             cbStream.println(str);
-            cbString = comparisonBuf.toString();
+            cbString = comparisonBuf.toString(StandardCharsets.UTF_8);
             cbLen = cbString.length();
             if (stString.regionMatches(charsIgnored, cbString, 0, cbLen)) {
                 charsIgnored += cbLen;

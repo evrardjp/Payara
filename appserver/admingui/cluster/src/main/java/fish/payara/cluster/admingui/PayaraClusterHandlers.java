@@ -8,7 +8,7 @@
  * and Distribution License("CDDL") (collectively, the "License").  You
  * may not use this file except in compliance with the License.  You can
  * obtain a copy of the License at
- * https://github.com/payara/Payara/blob/master/LICENSE.txt
+ * https://github.com/payara/Payara/blob/main/LICENSE.txt
  * See the License for the specific
  * language governing permissions and limitations under the License.
  *
@@ -49,22 +49,24 @@ import org.glassfish.admingui.common.util.GuiUtil;
 
 public class PayaraClusterHandlers {
 
-    @Handler(id = "py.generateInstanceNameIfRequired",
+    @Handler(id = "py.generateAutoNameIfRequired",
             input = {
-                    @HandlerInput(name = "name", type = String.class, required = true),
-                    @HandlerInput(name = "autoname", type = Boolean.class, required = true)
+                @HandlerInput(name = "name", type = String.class, required = true),
+                @HandlerInput(name = "autoname", type = Boolean.class, required = true),
+                @HandlerInput(name = "emptyErrorMsg", type = String.class, required = true)
             },
             output = {
-                    @HandlerOutput(name = "instanceName", type = String.class)})
-    public static void generateInstanceNameIfRequired(HandlerContext handlerCtx) {
+                @HandlerOutput(name = "instanceName", type = String.class)})
+    public static void generateAutoNameIfRequired(HandlerContext handlerCtx) {
         String instanceName = (String) handlerCtx.getInputValue("name");
         Boolean autoname = (Boolean) handlerCtx.getInputValue("autoname");
+        String emptyErrorMsg = (String) handlerCtx.getInputValue("emptyErrorMsg");
 
         if (GuiUtil.isEmpty(instanceName)) {
             if (autoname) {
                 instanceName = NameGenerator.generateName();
             } else {
-                GuiUtil.prepareAlert("error", "No instance name provided, and Auto Name not enabled", null);
+                GuiUtil.prepareAlert("error", emptyErrorMsg, null);
                 handlerCtx.getFacesContext().renderResponse();
             }
         }
